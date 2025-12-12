@@ -777,6 +777,9 @@
         let shoppingList = JSON.parse(localStorage.getItem('shoppingList')) || [];
         let selectedStore = localStorage.getItem('selectedStore') || '';
         let html5QrCode = null;
+        let lastScannedBarcode = null;
+        let lastScanTime = 0;
+        const SCAN_COOLDOWN = 2000; // 2 שניות בין סריקות של אותו ברקוד
 
         // Init
         document.addEventListener('DOMContentLoaded', async () => {
@@ -878,24 +881,35 @@
             localStorage.setItem('userProducts', JSON.stringify(userProducts));
         }
 
-        // חפש מוצר במאגר לפי ברקוד
+        // חפש מוצר במאגר לפי ברקוד (כולל בדיקה הפוכה)
         function findProductByBarcode(barcode) {
-            // 1. חפש במאגר המקומי (מהסופרים)
-            if (productsMap[barcode]) {
-                return {
-                    barcode: barcode,
-                    name: productsMap[barcode].name,
-                    price: productsMap[barcode].price || 0
-                };
-            }
+            // נקה את הברקוד
+            const cleanBarcode = barcode.trim();
 
-            // 2. חפש במוצרים שהמשתמש שמר
-            if (userProducts[barcode]) {
-                return {
-                    barcode: barcode,
-                    name: userProducts[barcode].name,
-                    price: userProducts[barcode].price
-                };
+            // נסה גם את הברקוד ההפוך (למקרה שנסרק הפוך)
+            const reversedBarcode = cleanBarcode.split('').reverse().join('');
+
+            // בדוק את שני הכיוונים
+            const barcodesToCheck = [cleanBarcode, reversedBarcode];
+
+            for (const code of barcodesToCheck) {
+                // 1. חפש במאגר המקומי (מהסופרים)
+                if (productsMap[code]) {
+                    return {
+                        barcode: code,
+                        name: productsMap[code].name,
+                        price: productsMap[code].price || 0
+                    };
+                }
+
+                // 2. חפש במוצרים שהמשתמש שמר
+                if (userProducts[code]) {
+                    return {
+                        barcode: code,
+                        name: userProducts[code].name,
+                        price: userProducts[code].price
+                    };
+                }
             }
 
             return null;
@@ -953,18 +967,38 @@
                 { facingMode: "environment" },
                 config,
                 async (decodedText) => {
+                    // מניעת סריקות כפולות - בדוק אם זה אותו ברקוד בזמן קצר
+                    const now = Date.now();
+                    const normalizedBarcode = decodedText.trim();
+                    const reversedBarcode = normalizedBarcode.split('').reverse().join('');
+
+                    // בדוק אם זה אותו ברקוד (רגיל או הפוך) תוך זמן ה-cooldown
+                    if ((normalizedBarcode === lastScannedBarcode || reversedBarcode === lastScannedBarcode) &&
+                        (now - lastScanTime) < SCAN_COOLDOWN) {
+                        return; // התעלם מסריקה כפולה
+                    }
+
+                    // עדכן את הברקוד האחרון והזמן
+                    lastScannedBarcode = normalizedBarcode;
+                    lastScanTime = now;
+
                     // Vibrate
                     if (navigator.vibrate) {
                         navigator.vibrate(100);
                     }
 
-                    // חפש קודם במאגר המקומי (10,000+ מוצרים)
+                    // חפש קודם במאגר המקומי (14,000+ מוצרים) - כולל בדיקה הפוכה
                     let product = findProductByBarcode(decodedText);
 
                     if (!product) {
                         // נסה API חיצוני
                         toast('מחפש מוצר...');
                         product = await fetchProductFromAPI(decodedText);
+
+                        // אם לא נמצא, נסה גם את ההפוך ב-API
+                        if (!product) {
+                            product = await fetchProductFromAPI(reversedBarcode);
+                        }
                     }
 
                     if (product) {
