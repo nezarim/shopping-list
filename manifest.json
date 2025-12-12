@@ -1,0 +1,36 @@
+{
+    "name": "רשימת קניות חכמה",
+    "short_name": "קניות",
+    "description": "אפליקציית רשימת קניות עם סריקת ברקוד ותשלום אונליין",
+    "start_url": "/",
+    "display": "standalone",
+    "background_color": "#f8fafc",
+    "theme_color": "#2563eb",
+    "orientation": "portrait",
+    "dir": "rtl",
+    "lang": "he",
+    "icons": [
+        {
+            "src": "icon-192.png",
+            "sizes": "192x192",
+            "type": "image/png",
+            "purpose": "any maskable"
+        },
+        {
+            "src": "icon-512.png",
+            "sizes": "512x512",
+            "type": "image/png",
+            "purpose": "any maskable"
+        }
+    ],
+    "categories": ["shopping", "utilities"],
+    "shortcuts": [
+        {
+            "name": "סרוק ברקוד",
+            "short_name": "סרוק",
+            "description": "פתח את סורק הברקוד",
+            "url": "/?action=scan",
+            "icons": [{ "src": "icon-192.png", "sizes": "192x192" }]
+        }
+    ]
+}

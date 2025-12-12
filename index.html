@@ -1,0 +1,1277 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="theme-color" content="#2563eb">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <title>רשימת קניות</title>
+    <link rel="manifest" href="manifest.json">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;
+            background: #f5f5f5;
+            min-height: 100vh;
+            padding-bottom: 180px;
+        }
+
+        .header {
+            background: #2563eb;
+            color: white;
+            padding: 15px 20px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 1.3rem;
+        }
+
+        /* בחירת חנות */
+        .store-selector {
+            background: white;
+            margin: 10px;
+            padding: 12px;
+            border-radius: 10px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+
+        .store-selector select {
+            width: 100%;
+            padding: 10px;
+            font-size: 1rem;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            background: white;
+        }
+
+        /* הוספה ידנית עם השלמה אוטומטית */
+        .add-section {
+            background: white;
+            margin: 10px;
+            padding: 12px;
+            border-radius: 10px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            position: relative;
+        }
+
+        .add-row {
+            display: flex;
+            gap: 8px;
+        }
+
+        .add-row input {
+            flex: 1;
+            padding: 12px;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            font-size: 1rem;
+        }
+
+        .add-btn {
+            padding: 12px 18px;
+            background: #4caf50;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-weight: 600;
+            font-size: 1.2rem;
+            cursor: pointer;
+        }
+
+        /* Autocomplete */
+        .autocomplete-list {
+            position: absolute;
+            top: 100%;
+            left: 12px;
+            right: 12px;
+            background: white;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            max-height: 200px;
+            overflow-y: auto;
+            z-index: 100;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            display: none;
+        }
+
+        .autocomplete-list.active {
+            display: block;
+        }
+
+        .autocomplete-item {
+            padding: 12px;
+            cursor: pointer;
+            border-bottom: 1px solid #eee;
+            display: flex;
+            justify-content: space-between;
+        }
+
+        .autocomplete-item:hover {
+            background: #f0f7ff;
+        }
+
+        .autocomplete-item:last-child {
+            border-bottom: none;
+        }
+
+        .autocomplete-item .price {
+            color: #2563eb;
+            font-weight: 600;
+        }
+
+        /* רשימת קניות */
+        .list-container {
+            background: white;
+            margin: 10px;
+            padding: 12px;
+            border-radius: 10px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+
+        .list-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid #eee;
+        }
+
+        .list-header h2 {
+            font-size: 1rem;
+        }
+
+        .item-count {
+            background: #2563eb;
+            color: white;
+            padding: 3px 10px;
+            border-radius: 15px;
+            font-size: 0.8rem;
+        }
+
+        .shopping-list {
+            list-style: none;
+        }
+
+        .shopping-item {
+            display: flex;
+            align-items: center;
+            padding: 10px 0;
+            border-bottom: 1px solid #eee;
+            gap: 8px;
+        }
+
+        .shopping-item:last-child {
+            border-bottom: none;
+        }
+
+        .item-checkbox {
+            width: 26px;
+            height: 26px;
+            border: 2px solid #ddd;
+            border-radius: 50%;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+            font-size: 0.8rem;
+        }
+
+        .item-checkbox.checked {
+            background: #4caf50;
+            border-color: #4caf50;
+            color: white;
+        }
+
+        .item-info {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .item-name {
+            font-weight: 500;
+            font-size: 0.95rem;
+        }
+
+        .item-barcode {
+            font-size: 0.7rem;
+            color: #888;
+            font-family: monospace;
+        }
+
+        .shopping-item.checked .item-name {
+            text-decoration: line-through;
+            color: #999;
+        }
+
+        .item-price {
+            font-weight: 600;
+            color: #2563eb;
+            font-size: 0.9rem;
+            min-width: 55px;
+            text-align: left;
+        }
+
+        .qty-controls {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .qty-btn {
+            width: 28px;
+            height: 28px;
+            border: none;
+            border-radius: 6px;
+            background: #f0f0f0;
+            font-size: 1.1rem;
+            cursor: pointer;
+        }
+
+        .qty-value {
+            min-width: 20px;
+            text-align: center;
+            font-weight: 600;
+            font-size: 0.9rem;
+        }
+
+        .delete-btn {
+            width: 32px;
+            height: 32px;
+            border: none;
+            border-radius: 6px;
+            background: #ffebee;
+            color: #c62828;
+            font-size: 1.1rem;
+            cursor: pointer;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 30px 20px;
+            color: #888;
+        }
+
+        .empty-state span {
+            font-size: 2.5rem;
+            display: block;
+            margin-bottom: 8px;
+        }
+
+        /* סה"כ */
+        .total-section {
+            background: linear-gradient(135deg, #2563eb, #1d4ed8);
+            margin: 10px;
+            padding: 15px;
+            border-radius: 10px;
+            color: white;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .total-section .label {
+            font-size: 1.1rem;
+        }
+
+        .total-section .amount {
+            font-size: 1.5rem;
+            font-weight: 700;
+        }
+
+        /* כפתורים תחתונים */
+        .bottom-actions {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: white;
+            padding: 12px;
+            box-shadow: 0 -2px 10px rgba(0,0,0,0.1);
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .scan-btn {
+            width: 100%;
+            padding: 14px;
+            background: #2563eb;
+            color: white;
+            border: none;
+            border-radius: 10px;
+            font-size: 1.1rem;
+            font-weight: 600;
+            cursor: pointer;
+        }
+
+        .action-row {
+            display: flex;
+            gap: 8px;
+        }
+
+        .send-btn {
+            flex: 1;
+            padding: 12px;
+            background: #4caf50;
+            color: white;
+            border: none;
+            border-radius: 10px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+        }
+
+        .send-btn:disabled {
+            background: #ccc;
+        }
+
+        .clear-btn {
+            padding: 12px 16px;
+            background: #f5f5f5;
+            color: #666;
+            border: none;
+            border-radius: 10px;
+            font-weight: 600;
+            cursor: pointer;
+        }
+
+        /* מודל סריקה */
+        .scanner-modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: black;
+            z-index: 1000;
+            flex-direction: column;
+        }
+
+        .scanner-modal.active {
+            display: flex;
+        }
+
+        .scanner-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px 15px;
+            background: rgba(0,0,0,0.9);
+            color: white;
+        }
+
+        .close-btn {
+            width: 36px;
+            height: 36px;
+            background: rgba(255,255,255,0.2);
+            border: none;
+            border-radius: 50%;
+            color: white;
+            font-size: 1.3rem;
+            cursor: pointer;
+        }
+
+        .scanner-body {
+            flex: 1;
+            position: relative;
+            overflow: hidden;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        #reader {
+            width: 100%;
+            height: 100%;
+        }
+
+        #reader video {
+            width: 100% !important;
+            height: 100% !important;
+            object-fit: cover !important;
+        }
+
+        .manual-barcode-btn {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            padding: 12px 24px;
+            background: rgba(255,255,255,0.2);
+            color: white;
+            border: 2px solid white;
+            border-radius: 25px;
+            font-size: 0.9rem;
+            cursor: pointer;
+        }
+
+        /* מודל שליחה */
+        .send-modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.5);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .send-modal.active {
+            display: flex;
+        }
+
+        .send-content {
+            background: white;
+            border-radius: 16px;
+            padding: 20px;
+            max-width: 400px;
+            width: 100%;
+            max-height: 80vh;
+            overflow-y: auto;
+        }
+
+        .send-content h2 {
+            margin-bottom: 15px;
+            text-align: center;
+            font-size: 1.2rem;
+        }
+
+        .send-options {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .send-option {
+            padding: 14px;
+            border: 2px solid #ddd;
+            border-radius: 10px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .send-option:hover {
+            border-color: #2563eb;
+            background: #f8faff;
+        }
+
+        .send-option span:first-child {
+            font-size: 1.3rem;
+        }
+
+        .send-option-text strong {
+            display: block;
+            font-size: 0.95rem;
+        }
+
+        .send-option-text small {
+            color: #888;
+            font-size: 0.8rem;
+        }
+
+        .qr-section {
+            margin-top: 15px;
+            text-align: center;
+            display: none;
+        }
+
+        .qr-section.active {
+            display: block;
+        }
+
+        #qrcode {
+            margin: 10px auto;
+        }
+
+        .json-preview {
+            margin-top: 10px;
+            background: #f5f5f5;
+            padding: 8px;
+            border-radius: 6px;
+            font-family: monospace;
+            font-size: 0.65rem;
+            max-height: 100px;
+            overflow-y: auto;
+            text-align: left;
+            direction: ltr;
+        }
+
+        .close-send-btn {
+            flex: 1;
+            padding: 12px;
+            background: #f5f5f5;
+            border: none;
+            border-radius: 10px;
+            font-weight: 600;
+            cursor: pointer;
+        }
+
+        .store-info-send {
+            text-align: center;
+            padding: 10px;
+            background: #e3f2fd;
+            border-radius: 8px;
+            margin-bottom: 15px;
+            font-weight: 500;
+        }
+
+        .barcode-list {
+            max-height: 50vh;
+            overflow-y: auto;
+        }
+
+        .barcode-item {
+            display: flex;
+            align-items: center;
+            padding: 12px;
+            border: 1px solid #eee;
+            border-radius: 8px;
+            margin-bottom: 8px;
+            gap: 12px;
+        }
+
+        .barcode-item canvas {
+            flex-shrink: 0;
+        }
+
+        .barcode-item-info {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .barcode-item-name {
+            font-weight: 500;
+            font-size: 0.9rem;
+            margin-bottom: 2px;
+        }
+
+        .barcode-item-code {
+            font-family: monospace;
+            font-size: 0.75rem;
+            color: #666;
+        }
+
+        .barcode-item-qty {
+            font-size: 0.85rem;
+            color: #2563eb;
+            font-weight: 600;
+        }
+
+        .total-send {
+            display: flex;
+            justify-content: space-between;
+            padding: 15px;
+            background: #f5f5f5;
+            border-radius: 8px;
+            margin: 15px 0;
+            font-size: 1.1rem;
+        }
+
+        .total-send strong {
+            color: #2563eb;
+        }
+
+        .send-actions {
+            display: flex;
+            gap: 10px;
+        }
+
+        .share-btn {
+            flex: 1;
+            padding: 12px;
+            background: #4caf50;
+            color: white;
+            border: none;
+            border-radius: 10px;
+            font-weight: 600;
+            cursor: pointer;
+        }
+
+        /* התראות */
+        .toast {
+            position: fixed;
+            top: 15px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #333;
+            color: white;
+            padding: 10px 20px;
+            border-radius: 8px;
+            z-index: 2000;
+            font-size: 0.9rem;
+            animation: fadeIn 0.3s ease;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateX(-50%) translateY(-10px); }
+            to { opacity: 1; transform: translateX(-50%) translateY(0); }
+        }
+    </style>
+</head>
+<body>
+    <header class="header">
+        <h1>🛒 רשימת קניות</h1>
+        <small id="productCount" style="opacity: 0.8; font-size: 0.75rem;">טוען מאגר...</small>
+    </header>
+
+    <!-- בחירת חנות -->
+    <section class="store-selector">
+        <select id="storeSelect">
+            <option value="">📍 בחר חנות...</option>
+            <option value="shufersal">שופרסל</option>
+            <option value="rami-levy">רמי לוי</option>
+            <option value="victory">ויקטורי</option>
+            <option value="yochananof">יוחננוף</option>
+            <option value="mega">מגה</option>
+            <option value="tiv-taam">טיב טעם</option>
+            <option value="osher-ad">אושר עד</option>
+        </select>
+    </section>
+
+    <!-- הוספה ידנית עם השלמה אוטומטית -->
+    <section class="add-section">
+        <div class="add-row">
+            <input type="text" id="searchInput" placeholder="🔍 חפש מוצר..." autocomplete="off">
+            <button class="add-btn" onclick="addFromSearch()">+</button>
+        </div>
+        <div class="autocomplete-list" id="autocompleteList"></div>
+    </section>
+
+    <!-- סה"כ -->
+    <section class="total-section" id="totalSection" style="display: none;">
+        <span class="label">סה"כ לתשלום:</span>
+        <span class="amount" id="totalAmount">₪0.00</span>
+    </section>
+
+    <!-- רשימת קניות -->
+    <section class="list-container">
+        <div class="list-header">
+            <h2>הרשימה שלי</h2>
+            <span class="item-count" id="itemCount">0 פריטים</span>
+        </div>
+        <ul class="shopping-list" id="shoppingList">
+            <li class="empty-state">
+                <span>🛒</span>
+                <p>הרשימה ריקה</p>
+            </li>
+        </ul>
+    </section>
+
+    <!-- כפתורים תחתונים -->
+    <div class="bottom-actions">
+        <button class="scan-btn" onclick="openScanner()">
+            📷 סרוק ברקוד
+        </button>
+        <div class="action-row">
+            <button class="send-btn" id="sendBtn" onclick="openSendModal()" disabled>
+                📤 שלח לחנות
+            </button>
+            <button class="clear-btn" onclick="clearList()">נקה</button>
+        </div>
+    </div>
+
+    <!-- מודל סריקה -->
+    <div class="scanner-modal" id="scannerModal">
+        <div class="scanner-header">
+            <h3>📷 סרוק ברקוד</h3>
+            <button class="close-btn" onclick="closeScanner()">✕</button>
+        </div>
+        <div class="scanner-body">
+            <div id="reader"></div>
+            <button class="manual-barcode-btn" onclick="enterBarcodeManually()">הזן ברקוד ידנית</button>
+        </div>
+    </div>
+
+    <!-- מודל שליחה - רשימת ברקודים -->
+    <div class="send-modal" id="sendModal">
+        <div class="send-content">
+            <h2>📤 רשימה לסריקה בקופה</h2>
+            <div class="store-info-send" id="storeInfoSend"></div>
+            <div class="barcode-list" id="barcodeList"></div>
+            <div class="total-send">
+                <span>סה"כ משוער:</span>
+                <strong id="totalSend">₪0.00</strong>
+            </div>
+            <div class="send-actions">
+                <button class="share-btn" onclick="shareList()">📨 שתף</button>
+                <button class="close-send-btn" onclick="closeSendModal()">סגור</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+
+    <script>
+        // מאגר מוצרים - יטען מקובץ JSON שנאסף מרשתות הסופרמרקט
+        let productsDB = [];
+        let productsMap = {}; // מפה לחיפוש מהיר לפי ברקוד
+
+        // טען מאגר מוצרים מהקובץ
+        async function loadProductsDB() {
+            try {
+                const response = await fetch('products_db.json');
+                const data = await response.json();
+
+                // המר לפורמט המתאים
+                productsDB = Object.entries(data).map(([barcode, info]) => ({
+                    barcode: barcode,
+                    name: info.name,
+                    price: info.price || 0,
+                    manufacturer: info.manufacturer || '',
+                    unit: info.unit || ''
+                }));
+
+                // צור מפה לחיפוש מהיר
+                productsMap = data;
+
+                console.log(`נטענו ${productsDB.length} מוצרים`);
+                document.getElementById('productCount').textContent = `${productsDB.length.toLocaleString()} מוצרים במאגר`;
+            } catch (e) {
+                console.error('שגיאה בטעינת מאגר:', e);
+                document.getElementById('productCount').textContent = 'מאגר לא זמין';
+            }
+        }
+
+        // State
+        let shoppingList = JSON.parse(localStorage.getItem('shoppingList')) || [];
+        let selectedStore = localStorage.getItem('selectedStore') || '';
+        let html5QrCode = null;
+
+        // Init
+        document.addEventListener('DOMContentLoaded', async () => {
+            // טען מאגר מוצרים
+            await loadProductsDB();
+
+            document.getElementById('storeSelect').value = selectedStore;
+            renderList();
+            setupAutocomplete();
+
+            document.getElementById('storeSelect').addEventListener('change', (e) => {
+                selectedStore = e.target.value;
+                localStorage.setItem('selectedStore', selectedStore);
+            });
+        });
+
+        // Autocomplete
+        function setupAutocomplete() {
+            const input = document.getElementById('searchInput');
+            const list = document.getElementById('autocompleteList');
+
+            input.addEventListener('input', (e) => {
+                const query = e.target.value.trim().toLowerCase();
+                if (query.length < 2) {
+                    list.classList.remove('active');
+                    return;
+                }
+
+                const matches = productsDB.filter(p =>
+                    p.name.toLowerCase().includes(query) ||
+                    p.barcode.includes(query)
+                ).slice(0, 8);
+
+                if (matches.length === 0) {
+                    list.classList.remove('active');
+                    return;
+                }
+
+                list.innerHTML = matches.map(p => `
+                    <div class="autocomplete-item" onclick="selectProduct('${p.barcode}')">
+                        <span>${p.name}</span>
+                        <span class="price">₪${p.price.toFixed(2)}</span>
+                    </div>
+                `).join('');
+                list.classList.add('active');
+            });
+
+            input.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') {
+                    addFromSearch();
+                }
+            });
+
+            document.addEventListener('click', (e) => {
+                if (!e.target.closest('.add-section')) {
+                    list.classList.remove('active');
+                }
+            });
+        }
+
+        function selectProduct(barcode) {
+            const product = productsDB.find(p => p.barcode === barcode);
+            if (product) {
+                addItem(product.barcode, product.name, product.price);
+                document.getElementById('searchInput').value = '';
+                document.getElementById('autocompleteList').classList.remove('active');
+            }
+        }
+
+        function addFromSearch() {
+            const input = document.getElementById('searchInput');
+            const query = input.value.trim();
+            if (!query) return;
+
+            // Check if it's a barcode
+            const byBarcode = productsDB.find(p => p.barcode === query);
+            if (byBarcode) {
+                addItem(byBarcode.barcode, byBarcode.name, byBarcode.price);
+            } else {
+                // Check if product name matches
+                const byName = productsDB.find(p => p.name.toLowerCase().includes(query.toLowerCase()));
+                if (byName) {
+                    addItem(byName.barcode, byName.name, byName.price);
+                } else {
+                    // Add as custom item
+                    addItem(null, query, 0);
+                }
+            }
+
+            input.value = '';
+            document.getElementById('autocompleteList').classList.remove('active');
+        }
+
+        // User's saved products (persisted)
+        let userProducts = JSON.parse(localStorage.getItem('userProducts')) || {};
+
+        function saveUserProduct(barcode, name, price) {
+            userProducts[barcode] = { name, price: price || 0 };
+            localStorage.setItem('userProducts', JSON.stringify(userProducts));
+        }
+
+        // חפש מוצר במאגר לפי ברקוד
+        function findProductByBarcode(barcode) {
+            // 1. חפש במאגר המקומי (מהסופרים)
+            if (productsMap[barcode]) {
+                return {
+                    barcode: barcode,
+                    name: productsMap[barcode].name,
+                    price: productsMap[barcode].price || 0
+                };
+            }
+
+            // 2. חפש במוצרים שהמשתמש שמר
+            if (userProducts[barcode]) {
+                return {
+                    barcode: barcode,
+                    name: userProducts[barcode].name,
+                    price: userProducts[barcode].price
+                };
+            }
+
+            return null;
+        }
+
+        // Fetch product from API if not found locally
+        async function fetchProductFromAPI(barcode) {
+            // Try Open Food Facts World
+            try {
+                const response = await fetch(`https://world.openfoodfacts.org/api/v0/product/${barcode}.json`);
+                const data = await response.json();
+
+                if (data.status === 1 && data.product) {
+                    const p = data.product;
+                    const name = p.product_name_he ||
+                                 p.product_name_il ||
+                                 p.product_name ||
+                                 p.generic_name_he ||
+                                 p.generic_name ||
+                                 (p.brands ? p.brands + ' - ' + (p.product_name || '') : null);
+                    if (name && name.trim()) {
+                        saveUserProduct(barcode, name.trim(), 0);
+                        return { barcode, name: name.trim(), price: 0 };
+                    }
+                }
+            } catch (e) {
+                console.error('Open Food Facts error:', e);
+            }
+
+            return null;
+        }
+
+        // Scanner Functions using Html5Qrcode
+        function openScanner() {
+            const modal = document.getElementById('scannerModal');
+            modal.classList.add('active');
+
+            html5QrCode = new Html5Qrcode("reader");
+
+            const config = {
+                fps: 10,
+                qrbox: { width: 250, height: 150 },
+                aspectRatio: 1.0,
+                formatsToSupport: [
+                    Html5QrcodeSupportedFormats.EAN_13,
+                    Html5QrcodeSupportedFormats.EAN_8,
+                    Html5QrcodeSupportedFormats.CODE_128,
+                    Html5QrcodeSupportedFormats.CODE_39,
+                    Html5QrcodeSupportedFormats.UPC_A,
+                    Html5QrcodeSupportedFormats.UPC_E
+                ]
+            };
+
+            html5QrCode.start(
+                { facingMode: "environment" },
+                config,
+                async (decodedText) => {
+                    // Vibrate
+                    if (navigator.vibrate) {
+                        navigator.vibrate(100);
+                    }
+
+                    // חפש קודם במאגר המקומי (10,000+ מוצרים)
+                    let product = findProductByBarcode(decodedText);
+
+                    if (!product) {
+                        // נסה API חיצוני
+                        toast('מחפש מוצר...');
+                        product = await fetchProductFromAPI(decodedText);
+                    }
+
+                    if (product) {
+                        addItem(product.barcode, product.name, product.price || 0);
+                        toast(`נוסף: ${product.name}`);
+                        closeScanner();
+                    } else {
+                        // לא נמצא - בקש מהמשתמש להזין
+                        closeScanner();
+                        const name = prompt(`מוצר לא נמצא במאגר\nברקוד: ${decodedText}\n\nהזן שם למוצר:`, '');
+                        if (name && name.trim()) {
+                            const priceStr = prompt(`מחיר ל"${name.trim()}" (או השאר ריק):`, '');
+                            const price = parseFloat(priceStr) || 0;
+                            saveUserProduct(decodedText, name.trim(), price);
+                            addItem(decodedText, name.trim(), price);
+                            toast(`נוסף ונשמר: ${name.trim()}`);
+                        } else {
+                            addItem(decodedText, `מוצר ${decodedText}`, 0);
+                            toast(`נוסף: ${decodedText}`);
+                        }
+                    }
+                },
+                (errorMessage) => {
+                    // Ignore scan errors
+                }
+            ).catch((err) => {
+                console.error('Scanner error:', err);
+                let msg = 'שגיאת מצלמה';
+                if (err.toString().includes('NotAllowedError')) {
+                    msg = 'נא לאשר גישה למצלמה';
+                } else if (err.toString().includes('NotFoundError')) {
+                    msg = 'לא נמצאה מצלמה';
+                }
+                toast(msg);
+                closeScanner();
+                setTimeout(() => enterBarcodeManually(), 300);
+            });
+        }
+
+        async function enterBarcodeManually() {
+            closeScanner();
+            const barcode = prompt('הזן מספר ברקוד:');
+            if (barcode && barcode.trim()) {
+                const code = barcode.trim();
+
+                // חפש קודם במאגר המקומי
+                let product = findProductByBarcode(code);
+
+                if (!product) {
+                    toast('מחפש מוצר...');
+                    product = await fetchProductFromAPI(code);
+                }
+
+                if (product) {
+                    addItem(product.barcode, product.name, product.price || 0);
+                    toast(`נוסף: ${product.name}`);
+                } else {
+                    const name = prompt(`מוצר לא נמצא במאגר\nהזן שם:`, '');
+                    if (name && name.trim()) {
+                        const priceStr = prompt(`מחיר ל"${name.trim()}" (או השאר ריק):`, '');
+                        const price = parseFloat(priceStr) || 0;
+                        saveUserProduct(code, name.trim(), price);
+                        addItem(code, name.trim(), price);
+                        toast(`נוסף ונשמר: ${name.trim()}`);
+                    } else {
+                        addItem(code, `מוצר ${code}`, 0);
+                        toast(`נוסף: ${code}`);
+                    }
+                }
+            }
+        }
+
+        function closeScanner() {
+            const modal = document.getElementById('scannerModal');
+            modal.classList.remove('active');
+
+            if (html5QrCode) {
+                html5QrCode.stop().catch(() => {});
+                html5QrCode = null;
+            }
+        }
+
+        // Item Management
+        function addItem(barcode, name, price) {
+            const existing = shoppingList.find(item =>
+                (barcode && item.barcode === barcode) || (!barcode && item.name === name)
+            );
+
+            if (existing) {
+                existing.quantity++;
+            } else {
+                shoppingList.push({
+                    id: Date.now(),
+                    barcode: barcode,
+                    name: name,
+                    price: price || 0,
+                    quantity: 1,
+                    checked: false
+                });
+            }
+
+            saveList();
+            renderList();
+        }
+
+        function updateQuantity(id, delta) {
+            const item = shoppingList.find(i => i.id === id);
+            if (item) {
+                item.quantity = Math.max(1, item.quantity + delta);
+                saveList();
+                renderList();
+            }
+        }
+
+        function toggleItem(id) {
+            const item = shoppingList.find(i => i.id === id);
+            if (item) {
+                item.checked = !item.checked;
+                saveList();
+                renderList();
+            }
+        }
+
+        function deleteItem(id) {
+            shoppingList = shoppingList.filter(i => i.id !== id);
+            saveList();
+            renderList();
+        }
+
+        function editPrice(id) {
+            const item = shoppingList.find(i => i.id === id);
+            if (item) {
+                const priceStr = prompt(`מחיר ל"${item.name}" (ליחידה):`, item.price || '');
+                const price = parseFloat(priceStr);
+                if (!isNaN(price) && price >= 0) {
+                    item.price = price;
+                    // Also save to user products if has barcode
+                    if (item.barcode) {
+                        saveUserProduct(item.barcode, item.name, price);
+                    }
+                    saveList();
+                    renderList();
+                    toast(`מחיר עודכן: ₪${price.toFixed(2)}`);
+                }
+            }
+        }
+
+        function clearList() {
+            if (shoppingList.length === 0) return;
+            if (confirm('למחוק את כל הרשימה?')) {
+                shoppingList = [];
+                saveList();
+                renderList();
+            }
+        }
+
+        function saveList() {
+            localStorage.setItem('shoppingList', JSON.stringify(shoppingList));
+        }
+
+        function renderList() {
+            const listEl = document.getElementById('shoppingList');
+            const countEl = document.getElementById('itemCount');
+            const totalSection = document.getElementById('totalSection');
+            const totalAmountEl = document.getElementById('totalAmount');
+            const sendBtn = document.getElementById('sendBtn');
+
+            const totalItems = shoppingList.reduce((sum, item) => sum + item.quantity, 0);
+            const totalPrice = shoppingList.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+
+            countEl.textContent = `${totalItems} פריטים`;
+
+            if (shoppingList.length === 0) {
+                listEl.innerHTML = `
+                    <li class="empty-state">
+                        <span>🛒</span>
+                        <p>הרשימה ריקה</p>
+                    </li>
+                `;
+                totalSection.style.display = 'none';
+                sendBtn.disabled = true;
+            } else {
+                listEl.innerHTML = shoppingList.map(item => `
+                    <li class="shopping-item ${item.checked ? 'checked' : ''}">
+                        <div class="item-checkbox ${item.checked ? 'checked' : ''}" onclick="toggleItem(${item.id})">
+                            ${item.checked ? '✓' : ''}
+                        </div>
+                        <div class="item-info">
+                            <div class="item-name">${item.name}</div>
+                            <div class="item-barcode">${item.barcode || '---'}</div>
+                        </div>
+                        <div class="item-price" onclick="editPrice(${item.id})" style="cursor:pointer;" title="לחץ לעריכה">₪${(item.price * item.quantity).toFixed(2)}</div>
+                        <div class="qty-controls">
+                            <button class="qty-btn" onclick="updateQuantity(${item.id}, -1)">−</button>
+                            <span class="qty-value">${item.quantity}</span>
+                            <button class="qty-btn" onclick="updateQuantity(${item.id}, 1)">+</button>
+                        </div>
+                        <button class="delete-btn" onclick="deleteItem(${item.id})">✕</button>
+                    </li>
+                `).join('');
+
+                totalSection.style.display = 'flex';
+                totalAmountEl.textContent = `₪${totalPrice.toFixed(2)}`;
+                sendBtn.disabled = false;
+            }
+        }
+
+        // Send Modal - Show Barcodes
+        function openSendModal() {
+            if (shoppingList.length === 0) return;
+
+            const modal = document.getElementById('sendModal');
+            const storeInfo = document.getElementById('storeInfoSend');
+            const barcodeList = document.getElementById('barcodeList');
+            const totalSend = document.getElementById('totalSend');
+
+            // Store info
+            const storeNames = {
+                'shufersal': 'שופרסל',
+                'rami-levy': 'רמי לוי',
+                'victory': 'ויקטורי',
+                'yochananof': 'יוחננוף',
+                'mega': 'מגה',
+                'tiv-taam': 'טיב טעם',
+                'osher-ad': 'אושר עד'
+            };
+            storeInfo.textContent = `🏪 ${storeNames[selectedStore] || 'לא נבחרה חנות'}`;
+
+            // Generate barcodes
+            barcodeList.innerHTML = '';
+            let total = 0;
+
+            shoppingList.forEach((item, index) => {
+                total += item.price * item.quantity;
+
+                const div = document.createElement('div');
+                div.className = 'barcode-item';
+
+                if (item.barcode) {
+                    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+                    svg.id = `barcode-${index}`;
+                    div.innerHTML = `
+                        <div class="barcode-svg-container"></div>
+                        <div class="barcode-item-info">
+                            <div class="barcode-item-name">${item.name}</div>
+                            <div class="barcode-item-code">${item.barcode}</div>
+                        </div>
+                        <div class="barcode-item-qty">x${item.quantity}</div>
+                    `;
+                    div.querySelector('.barcode-svg-container').appendChild(svg);
+                    barcodeList.appendChild(div);
+
+                    // Generate barcode
+                    try {
+                        JsBarcode(`#barcode-${index}`, item.barcode, {
+                            format: 'EAN13',
+                            width: 1.5,
+                            height: 40,
+                            displayValue: false,
+                            margin: 0
+                        });
+                    } catch (e) {
+                        // Try CODE128 if EAN13 fails
+                        try {
+                            JsBarcode(`#barcode-${index}`, item.barcode, {
+                                format: 'CODE128',
+                                width: 1.5,
+                                height: 40,
+                                displayValue: false,
+                                margin: 0
+                            });
+                        } catch (e2) {
+                            div.querySelector('.barcode-svg-container').innerHTML = '<span style="color:#999;font-size:0.8rem">ללא ברקוד</span>';
+                        }
+                    }
+                } else {
+                    div.innerHTML = `
+                        <div style="width:80px;text-align:center;color:#999;font-size:0.75rem">ללא ברקוד</div>
+                        <div class="barcode-item-info">
+                            <div class="barcode-item-name">${item.name}</div>
+                            <div class="barcode-item-code">---</div>
+                        </div>
+                        <div class="barcode-item-qty">x${item.quantity}</div>
+                    `;
+                    barcodeList.appendChild(div);
+                }
+            });
+
+            totalSend.textContent = `₪${total.toFixed(2)}`;
+            modal.classList.add('active');
+        }
+
+        function closeSendModal() {
+            document.getElementById('sendModal').classList.remove('active');
+        }
+
+        function shareList() {
+            const total = shoppingList.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+            const storeNames = {
+                'shufersal': 'שופרסל',
+                'rami-levy': 'רמי לוי',
+                'victory': 'ויקטורי',
+                'yochananof': 'יוחננוף',
+                'mega': 'מגה',
+                'tiv-taam': 'טיב טעם',
+                'osher-ad': 'אושר עד'
+            };
+
+            const text = `🛒 רשימת קניות\n` +
+                `🏪 ${storeNames[selectedStore] || 'לא נבחרה חנות'}\n` +
+                `💰 סה"כ: ₪${total.toFixed(2)}\n\n` +
+                shoppingList.map(i => `• ${i.name} x${i.quantity} - ₪${(i.price * i.quantity).toFixed(2)}${i.barcode ? ` [${i.barcode}]` : ''}`).join('\n');
+
+            if (navigator.share) {
+                navigator.share({ title: 'רשימת קניות', text });
+            } else {
+                navigator.clipboard.writeText(text);
+                toast('הועתק ללוח');
+            }
+        }
+
+        function toast(msg) {
+            const existing = document.querySelector('.toast');
+            if (existing) existing.remove();
+
+            const t = document.createElement('div');
+            t.className = 'toast';
+            t.textContent = msg;
+            document.body.appendChild(t);
+
+            setTimeout(() => t.remove(), 2500);
+        }
+    </script>
+</body>
+</html>
