@@ -41,13 +41,96 @@
             box-shadow: 0 2px 8px rgba(0,0,0,0.1);
         }
 
+        .store-selector-row {
+            display: flex;
+            gap: 8px;
+            align-items: stretch;
+        }
+
         .store-selector select {
-            width: 100%;
+            flex: 1;
             padding: 10px;
             font-size: 1rem;
             border: 2px solid #ddd;
             border-radius: 8px;
             background: white;
+        }
+
+        .location-btn {
+            padding: 10px 14px;
+            background: #2563eb;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 1.1rem;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-width: 48px;
+            transition: all 0.3s ease;
+        }
+
+        .location-btn:hover {
+            background: #1d4ed8;
+        }
+
+        .location-btn.loading {
+            background: #ffa500;
+            animation: pulse 1s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.6; }
+        }
+
+        .detected-store {
+            margin-top: 10px;
+            padding: 12px;
+            background: linear-gradient(135deg, #e8f5e9, #c8e6c9);
+            border-radius: 8px;
+            border-right: 4px solid #4caf50;
+        }
+
+        .detected-store-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 6px;
+        }
+
+        .detected-store-label {
+            font-size: 0.75rem;
+            color: #666;
+        }
+
+        .detected-store-distance {
+            font-size: 0.75rem;
+            color: #2563eb;
+            font-weight: 600;
+        }
+
+        .detected-store-name {
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 4px;
+        }
+
+        .detected-store-address {
+            font-size: 0.85rem;
+            color: #666;
+        }
+
+        .detected-store-type {
+            display: inline-block;
+            margin-top: 6px;
+            padding: 3px 8px;
+            background: #2563eb;
+            color: white;
+            border-radius: 12px;
+            font-size: 0.7rem;
         }
 
         /* הוספה ידנית עם השלמה אוטומטית */
@@ -631,16 +714,22 @@
 
     <!-- בחירת חנות -->
     <section class="store-selector">
-        <select id="storeSelect">
-            <option value="">📍 בחר חנות...</option>
-            <option value="shufersal">שופרסל</option>
-            <option value="rami-levy">רמי לוי</option>
-            <option value="victory">ויקטורי</option>
-            <option value="yochananof">יוחננוף</option>
-            <option value="mega">מגה</option>
-            <option value="tiv-taam">טיב טעם</option>
-            <option value="osher-ad">אושר עד</option>
-        </select>
+        <div class="store-selector-row">
+            <select id="storeSelect">
+                <option value="">📍 בחר חנות...</option>
+                <option value="shufersal">שופרסל</option>
+                <option value="rami-levy">רמי לוי</option>
+                <option value="victory">ויקטורי</option>
+                <option value="yochananof">יוחננוף</option>
+                <option value="mega">מגה</option>
+                <option value="tiv-taam">טיב טעם</option>
+                <option value="osher-ad">אושר עד</option>
+            </select>
+            <button class="location-btn" id="locationBtn" onclick="detectNearbyStore()" title="זהה חנות לפי מיקום">
+                📍
+            </button>
+        </div>
+        <div id="detectedStoreInfo"></div>
     </section>
 
     <!-- הוספה ידנית עם השלמה אוטומטית -->
@@ -1471,6 +1560,298 @@
                     nextBarcode();
                 }, scanModeSpeed);
             }
+        }
+
+        // ======= זיהוי חנות לפי מיקום =======
+        let detectedStore = null;
+
+        async function detectNearbyStore() {
+            const btn = document.getElementById('locationBtn');
+            const infoDiv = document.getElementById('detectedStoreInfo');
+
+            // בדוק תמיכה ב-Geolocation
+            if (!navigator.geolocation) {
+                toast('הדפדפן לא תומך במיקום');
+                return;
+            }
+
+            // מצב טעינה
+            btn.classList.add('loading');
+            btn.innerHTML = '⏳';
+            infoDiv.innerHTML = '<div style="text-align:center;padding:10px;color:#666;">מחפש חנויות קרובות...</div>';
+
+            try {
+                // קבל מיקום נוכחי
+                const position = await new Promise((resolve, reject) => {
+                    navigator.geolocation.getCurrentPosition(resolve, reject, {
+                        enableHighAccuracy: true,
+                        timeout: 10000,
+                        maximumAge: 60000
+                    });
+                });
+
+                const lat = position.coords.latitude;
+                const lon = position.coords.longitude;
+                const accuracy = position.coords.accuracy;
+
+                console.log(`מיקום: ${lat}, ${lon} (דיוק: ${accuracy}מ')`);
+
+                // חפש חנויות קרובות באמצעות Overpass API
+                const stores = await findNearbyStores(lat, lon);
+
+                if (stores.length > 0) {
+                    // מצא את החנות הקרובה ביותר
+                    const nearest = stores[0];
+                    detectedStore = nearest;
+
+                    displayDetectedStore(nearest, lat, lon);
+                    toast(`נמצאה חנות: ${nearest.name}`);
+                } else {
+                    // אם לא נמצאו חנויות, נסה reverse geocoding
+                    const location = await reverseGeocode(lat, lon);
+                    if (location) {
+                        infoDiv.innerHTML = `
+                            <div class="detected-store" style="background: linear-gradient(135deg, #fff3e0, #ffe0b2); border-right-color: #ff9800;">
+                                <div class="detected-store-header">
+                                    <span class="detected-store-label">📍 מיקום נוכחי</span>
+                                    <span class="detected-store-distance">דיוק: ${Math.round(accuracy)}מ'</span>
+                                </div>
+                                <div class="detected-store-name">${location.display_name || 'מיקום לא ידוע'}</div>
+                                <div class="detected-store-address">${location.address?.road || ''} ${location.address?.house_number || ''}, ${location.address?.city || location.address?.town || location.address?.village || ''}</div>
+                                <div style="margin-top:8px;font-size:0.8rem;color:#666;">לא נמצאו חנויות בקרבת מקום</div>
+                            </div>
+                        `;
+                    } else {
+                        infoDiv.innerHTML = `
+                            <div class="detected-store" style="background: #ffebee; border-right-color: #f44336;">
+                                <div class="detected-store-name">לא נמצאו חנויות</div>
+                                <div class="detected-store-address">נסה שוב או בחר חנות ידנית</div>
+                            </div>
+                        `;
+                    }
+                }
+            } catch (error) {
+                console.error('שגיאת מיקום:', error);
+                let errorMsg = 'שגיאה בקבלת מיקום';
+
+                if (error.code === 1) {
+                    errorMsg = 'נא לאשר גישה למיקום';
+                } else if (error.code === 2) {
+                    errorMsg = 'לא ניתן לקבוע מיקום';
+                } else if (error.code === 3) {
+                    errorMsg = 'זמן קבלת מיקום פג';
+                }
+
+                toast(errorMsg);
+                infoDiv.innerHTML = `
+                    <div class="detected-store" style="background: #ffebee; border-right-color: #f44336;">
+                        <div class="detected-store-name">${errorMsg}</div>
+                        <div class="detected-store-address">נסה שוב או בחר חנות ידנית</div>
+                    </div>
+                `;
+            } finally {
+                btn.classList.remove('loading');
+                btn.innerHTML = '📍';
+            }
+        }
+
+        // חפש חנויות קרובות באמצעות Overpass API (OpenStreetMap)
+        async function findNearbyStores(lat, lon, radius = 500) {
+            const overpassUrl = 'https://overpass-api.de/api/interpreter';
+
+            // שאילתה לחיפוש חנויות, סופרמרקטים, מכולות וכו'
+            const query = `
+                [out:json][timeout:10];
+                (
+                    node["shop"="supermarket"](around:${radius},${lat},${lon});
+                    node["shop"="convenience"](around:${radius},${lat},${lon});
+                    node["shop"="grocery"](around:${radius},${lat},${lon});
+                    node["shop"="general"](around:${radius},${lat},${lon});
+                    node["shop"="department_store"](around:${radius},${lat},${lon});
+                    node["amenity"="marketplace"](around:${radius},${lat},${lon});
+                    way["shop"="supermarket"](around:${radius},${lat},${lon});
+                    way["shop"="convenience"](around:${radius},${lat},${lon});
+                    way["shop"="grocery"](around:${radius},${lat},${lon});
+                );
+                out center body;
+            `;
+
+            try {
+                const response = await fetch(overpassUrl, {
+                    method: 'POST',
+                    body: `data=${encodeURIComponent(query)}`,
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded'
+                    }
+                });
+
+                const data = await response.json();
+
+                if (!data.elements || data.elements.length === 0) {
+                    // נסה עם רדיוס גדול יותר
+                    if (radius < 2000) {
+                        return findNearbyStores(lat, lon, radius * 2);
+                    }
+                    return [];
+                }
+
+                // עבד את התוצאות
+                const stores = data.elements.map(element => {
+                    const storeLat = element.lat || element.center?.lat;
+                    const storeLon = element.lon || element.center?.lon;
+                    const distance = calculateDistance(lat, lon, storeLat, storeLon);
+
+                    return {
+                        id: element.id,
+                        name: element.tags?.name || element.tags?.brand || 'חנות',
+                        type: getStoreType(element.tags),
+                        address: formatAddress(element.tags),
+                        lat: storeLat,
+                        lon: storeLon,
+                        distance: distance,
+                        tags: element.tags
+                    };
+                });
+
+                // מיין לפי מרחק
+                stores.sort((a, b) => a.distance - b.distance);
+
+                return stores;
+            } catch (error) {
+                console.error('שגיאת Overpass:', error);
+                return [];
+            }
+        }
+
+        // Reverse geocoding באמצעות Nominatim
+        async function reverseGeocode(lat, lon) {
+            try {
+                const url = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}&zoom=18&addressdetails=1&accept-language=he`;
+                const response = await fetch(url, {
+                    headers: {
+                        'User-Agent': 'ShoppingListApp/1.0'
+                    }
+                });
+                return await response.json();
+            } catch (error) {
+                console.error('שגיאת Nominatim:', error);
+                return null;
+            }
+        }
+
+        // חשב מרחק בין שתי נקודות (בקילומטרים)
+        function calculateDistance(lat1, lon1, lat2, lon2) {
+            const R = 6371; // רדיוס כדור הארץ בק"מ
+            const dLat = (lat2 - lat1) * Math.PI / 180;
+            const dLon = (lon2 - lon1) * Math.PI / 180;
+            const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+                      Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+                      Math.sin(dLon/2) * Math.sin(dLon/2);
+            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+            return R * c;
+        }
+
+        // קבל סוג חנות בעברית
+        function getStoreType(tags) {
+            if (!tags) return 'חנות';
+
+            const typeMap = {
+                'supermarket': 'סופרמרקט',
+                'convenience': 'מכולת',
+                'grocery': 'מכולת',
+                'general': 'כלבו',
+                'department_store': 'כלבו',
+                'marketplace': 'שוק'
+            };
+
+            return typeMap[tags.shop] || typeMap[tags.amenity] || 'חנות';
+        }
+
+        // פרמט כתובת
+        function formatAddress(tags) {
+            if (!tags) return '';
+
+            const parts = [];
+            if (tags['addr:street']) parts.push(tags['addr:street']);
+            if (tags['addr:housenumber']) parts.push(tags['addr:housenumber']);
+            if (tags['addr:city']) parts.push(tags['addr:city']);
+
+            return parts.join(' ') || tags.address || '';
+        }
+
+        // הצג חנות שזוהתה
+        function displayDetectedStore(store, userLat, userLon) {
+            const infoDiv = document.getElementById('detectedStoreInfo');
+            const distanceText = store.distance < 1
+                ? `${Math.round(store.distance * 1000)}מ'`
+                : `${store.distance.toFixed(1)}ק"מ`;
+
+            // בדוק אם זו רשת מוכרת
+            const knownChains = {
+                'שופרסל': 'shufersal',
+                'shufersal': 'shufersal',
+                'רמי לוי': 'rami-levy',
+                'rami levy': 'rami-levy',
+                'ויקטורי': 'victory',
+                'victory': 'victory',
+                'יוחננוף': 'yochananof',
+                'yochananof': 'yochananof',
+                'מגה': 'mega',
+                'mega': 'mega',
+                'טיב טעם': 'tiv-taam',
+                'tiv taam': 'tiv-taam',
+                'אושר עד': 'osher-ad',
+                'osher ad': 'osher-ad',
+                'am:pm': 'ampm',
+                'yellow': 'yellow',
+                'קרפור': 'carrefour',
+                'carrefour': 'carrefour',
+                'מחסני השוק': 'machsanei-hashuk',
+                'חצי חינם': 'hatzi-hinam',
+                'קינג סטור': 'king-store',
+                'king store': 'king-store'
+            };
+
+            const storeName = store.name.toLowerCase();
+            let chainKey = null;
+            for (const [name, key] of Object.entries(knownChains)) {
+                if (storeName.includes(name.toLowerCase())) {
+                    chainKey = key;
+                    break;
+                }
+            }
+
+            infoDiv.innerHTML = `
+                <div class="detected-store">
+                    <div class="detected-store-header">
+                        <span class="detected-store-label">🎯 חנות שזוהתה</span>
+                        <span class="detected-store-distance">${distanceText}</span>
+                    </div>
+                    <div class="detected-store-name">${store.name}</div>
+                    ${store.address ? `<div class="detected-store-address">${store.address}</div>` : ''}
+                    <span class="detected-store-type">${store.type}</span>
+                    ${chainKey ? `
+                        <button onclick="selectDetectedChain('${chainKey}')" style="margin-top:8px;margin-right:8px;padding:6px 12px;background:#4caf50;color:white;border:none;border-radius:6px;font-size:0.8rem;cursor:pointer;">
+                            ✓ בחר רשת זו
+                        </button>
+                    ` : ''}
+                </div>
+            `;
+
+            // אם זו רשת מוכרת, בחר אותה אוטומטית
+            if (chainKey) {
+                document.getElementById('storeSelect').value = chainKey;
+                selectedStore = chainKey;
+                localStorage.setItem('selectedStore', selectedStore);
+            }
+        }
+
+        // בחר רשת שזוהתה
+        function selectDetectedChain(chainKey) {
+            document.getElementById('storeSelect').value = chainKey;
+            selectedStore = chainKey;
+            localStorage.setItem('selectedStore', selectedStore);
+            toast('הרשת נבחרה!');
         }
     </script>
 </body>
