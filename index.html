@@ -708,9 +708,34 @@
                 <strong id="totalSend">₪0.00</strong>
             </div>
             <div class="send-actions">
+                <button class="scan-mode-btn" onclick="startScanMode()" style="flex:1;padding:12px;background:#2563eb;color:white;border:none;border-radius:10px;font-weight:600;cursor:pointer;">🔄 מצב סריקה מהיר</button>
                 <button class="share-btn" onclick="shareList()">📨 שתף</button>
                 <button class="close-send-btn" onclick="closeSendModal()">סגור</button>
             </div>
+        </div>
+    </div>
+
+    <!-- מודל מצב סריקה מהיר -->
+    <div class="scan-mode-modal" id="scanModeModal" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:#000;z-index:2000;flex-direction:column;">
+        <div style="padding:15px;background:#1a1a1a;display:flex;justify-content:space-between;align-items:center;">
+            <span style="color:white;font-size:1.1rem;font-weight:600;">🔄 מצב סריקה מהיר</span>
+            <button onclick="stopScanMode()" style="background:#333;border:none;color:white;width:40px;height:40px;border-radius:50%;font-size:1.2rem;cursor:pointer;">✕</button>
+        </div>
+        <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:20px;">
+            <div id="scanModeProduct" style="color:white;font-size:1.3rem;margin-bottom:10px;text-align:center;"></div>
+            <div id="scanModeBarcode" style="background:white;padding:20px 40px;border-radius:12px;"></div>
+            <div id="scanModeCounter" style="color:#888;margin-top:15px;font-size:1rem;"></div>
+            <div id="scanModeQty" style="color:#4caf50;margin-top:5px;font-size:1.2rem;font-weight:600;"></div>
+        </div>
+        <div style="padding:15px;background:#1a1a1a;display:flex;gap:10px;">
+            <button onclick="prevBarcode()" style="flex:1;padding:15px;background:#333;color:white;border:none;border-radius:10px;font-size:1.1rem;cursor:pointer;">◀ הקודם</button>
+            <button onclick="toggleAutoScan()" id="autoScanBtn" style="flex:1;padding:15px;background:#4caf50;color:white;border:none;border-radius:10px;font-size:1.1rem;cursor:pointer;">▶ התחל אוטומטי</button>
+            <button onclick="nextBarcode()" style="flex:1;padding:15px;background:#333;color:white;border:none;border-radius:10px;font-size:1.1rem;cursor:pointer;">הבא ▶</button>
+        </div>
+        <div style="padding:10px 15px 20px;background:#1a1a1a;">
+            <label style="color:#888;font-size:0.9rem;">מהירות (שניות):</label>
+            <input type="range" id="scanSpeed" min="1" max="5" value="2" style="width:100%;margin-top:5px;" onchange="updateSpeed()">
+            <div style="display:flex;justify-content:space-between;color:#666;font-size:0.8rem;"><span>מהיר (1ש׳)</span><span>איטי (5ש׳)</span></div>
         </div>
     </div>
 
@@ -1271,6 +1296,147 @@
             document.body.appendChild(t);
 
             setTimeout(() => t.remove(), 2500);
+        }
+
+        // מצב סריקה מהיר - משתנים
+        let scanModeItems = [];
+        let scanModeIndex = 0;
+        let scanModeInterval = null;
+        let scanModeSpeed = 2000;
+        let isAutoScanning = false;
+
+        function startScanMode() {
+            // יצירת רשימה "שטוחה" - כל יחידה בנפרד
+            scanModeItems = [];
+            shoppingList.forEach(item => {
+                if (item.barcode) {
+                    for (let i = 0; i < item.quantity; i++) {
+                        scanModeItems.push({
+                            name: item.name,
+                            barcode: item.barcode,
+                            itemNum: i + 1,
+                            totalQty: item.quantity
+                        });
+                    }
+                }
+            });
+
+            if (scanModeItems.length === 0) {
+                toast('אין מוצרים עם ברקוד');
+                return;
+            }
+
+            scanModeIndex = 0;
+            isAutoScanning = false;
+            document.getElementById('autoScanBtn').textContent = '▶ התחל אוטומטי';
+            document.getElementById('autoScanBtn').style.background = '#4caf50';
+
+            closeSendModal();
+            document.getElementById('scanModeModal').style.display = 'flex';
+            showCurrentBarcode();
+        }
+
+        function stopScanMode() {
+            if (scanModeInterval) {
+                clearInterval(scanModeInterval);
+                scanModeInterval = null;
+            }
+            isAutoScanning = false;
+            document.getElementById('scanModeModal').style.display = 'none';
+        }
+
+        function showCurrentBarcode() {
+            const item = scanModeItems[scanModeIndex];
+            document.getElementById('scanModeProduct').textContent = item.name;
+            document.getElementById('scanModeCounter').textContent = `${scanModeIndex + 1} מתוך ${scanModeItems.length}`;
+
+            if (item.totalQty > 1) {
+                document.getElementById('scanModeQty').textContent = `יחידה ${item.itemNum} מתוך ${item.totalQty}`;
+            } else {
+                document.getElementById('scanModeQty').textContent = '';
+            }
+
+            // יצירת ברקוד גדול
+            const container = document.getElementById('scanModeBarcode');
+            container.innerHTML = '<svg id="bigBarcode"></svg>';
+
+            try {
+                JsBarcode('#bigBarcode', item.barcode, {
+                    format: 'EAN13',
+                    width: 3,
+                    height: 120,
+                    displayValue: true,
+                    fontSize: 18,
+                    margin: 10
+                });
+            } catch (e) {
+                try {
+                    JsBarcode('#bigBarcode', item.barcode, {
+                        format: 'CODE128',
+                        width: 3,
+                        height: 120,
+                        displayValue: true,
+                        fontSize: 18,
+                        margin: 10
+                    });
+                } catch (e2) {
+                    container.innerHTML = `<div style="padding:40px;color:#666;">${item.barcode}</div>`;
+                }
+            }
+        }
+
+        function nextBarcode() {
+            if (scanModeIndex < scanModeItems.length - 1) {
+                scanModeIndex++;
+                showCurrentBarcode();
+            } else {
+                // סיום
+                if (isAutoScanning) {
+                    toggleAutoScan();
+                }
+                toast('סיום! כל המוצרים נסרקו');
+            }
+        }
+
+        function prevBarcode() {
+            if (scanModeIndex > 0) {
+                scanModeIndex--;
+                showCurrentBarcode();
+            }
+        }
+
+        function toggleAutoScan() {
+            const btn = document.getElementById('autoScanBtn');
+
+            if (isAutoScanning) {
+                // עצור
+                clearInterval(scanModeInterval);
+                scanModeInterval = null;
+                isAutoScanning = false;
+                btn.textContent = '▶ המשך אוטומטי';
+                btn.style.background = '#4caf50';
+            } else {
+                // התחל
+                isAutoScanning = true;
+                btn.textContent = '⏸ עצור';
+                btn.style.background = '#ff9800';
+
+                scanModeInterval = setInterval(() => {
+                    nextBarcode();
+                }, scanModeSpeed);
+            }
+        }
+
+        function updateSpeed() {
+            scanModeSpeed = document.getElementById('scanSpeed').value * 1000;
+
+            // עדכן interval אם רץ
+            if (isAutoScanning && scanModeInterval) {
+                clearInterval(scanModeInterval);
+                scanModeInterval = setInterval(() => {
+                    nextBarcode();
+                }, scanModeSpeed);
+            }
         }
     </script>
 </body>
